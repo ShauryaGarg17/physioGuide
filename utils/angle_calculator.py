@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def calculate_angle(a, b, c):
     """
     Calculate the angle between three points
@@ -11,14 +10,18 @@ def calculate_angle(a, b, c):
     Returns:
         angle: Angle in degrees
     """
+    if not (len(a) == len(b) == len(c) == 2):
+        raise ValueError("Input points must be 2D coordinates.")
+
     a = np.array(a)
     b = np.array(b)
     c = np.array(c)
 
-    radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])
-    angle = np.abs(radians * 180.0 / np.pi)
+    ba = a - b
+    bc = c - b
 
-    if angle > 180.0:
-        angle = 360 - angle
+    cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
+    cosine_angle = np.clip(cosine_angle, -1.0, 1.0)  # Clip to avoid floating point issues
+    angle = np.degrees(np.arccos(cosine_angle))
 
     return angle

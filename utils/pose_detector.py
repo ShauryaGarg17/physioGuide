@@ -1,69 +1,41 @@
-# import cv2
-# import mediapipe as mp
-# import numpy as np
-#
-#
-# class PoseDetector:
-#     def __init__(self, static_image_mode=False, model_complexity=1, min_detection_confidence=0.5,
-#                  min_tracking_confidence=0.5):
-#         self.static_image_mode = static_image_mode
-#         self.model_complexity = model_complexity
-#         self.min_detection_confidence = min_detection_confidence
-#         self.min_tracking_confidence = min_tracking_confidence
-#
-#         self.mp_pose = mp.solutions.pose
-#         self.pose = self.mp_pose.Pose(
-#             static_image_mode=self.static_image_mode,
-#             model_complexity=self.model_complexity,
-#             min_detection_confidence=self.min_detection_confidence,
-#             min_tracking_confidence=self.min_tracking_confidence
-#         )
-#         self.mp_draw = mp.solutions.drawing_utils
-#
-#     def find_pose(self, img, draw=True):
-#         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-#         self.results = self.pose.process(img_rgb)
-#
-#         if self.results.pose_landmarks and draw:
-#             self.mp_draw.draw_landmarks(
-#                 img,
-#                 self.results.pose_landmarks,
-#                 self.mp_pose.POSE_CONNECTIONS
-#             )
-#         return img
-#
-#     def get_positions(self, img):
-#         landmarks = []
-#         if self.results.pose_landmarks:
-#             for id, lm in enumerate(self.results.pose_landmarks.landmark):
-#                 h, w, c = img.shape
-#                 cx, cy = int(lm.x * w), int(lm.y * h)
-#                 landmarks.append([id, cx, cy])
-#         return landmarks
-
 import cv2
 import mediapipe as mp
 import numpy as np
-import math
+from .angle_calculator import calculate_angle
 
 class PoseDetector:
-    def __init__(self, static_image_mode=False, model_complexity=1, min_detection_confidence=0.5,
+    def __init__(self, static_image_mode=False,
+                 model_complexity=1,
+                 smooth_landmarks=True,
+                 enable_segmentation=False,
+                 smooth_segmentation=True,
+                 min_detection_confidence=0.5,
                  min_tracking_confidence=0.5):
-        self.static_image_mode = static_image_mode
-        self.model_complexity = model_complexity
-        self.min_detection_confidence = min_detection_confidence
-        self.min_tracking_confidence = min_tracking_confidence
-
+        """
+        Initialize the PoseDetector with MediaPipe Pose parameters
+        """
         self.mp_pose = mp.solutions.pose
         self.pose = self.mp_pose.Pose(
-            static_image_mode=self.static_image_mode,
-            model_complexity=self.model_complexity,
-            min_detection_confidence=self.min_detection_confidence,
-            min_tracking_confidence=self.min_tracking_confidence
+            static_image_mode=static_image_mode,
+            model_complexity=model_complexity,
+            smooth_landmarks=smooth_landmarks,
+            enable_segmentation=enable_segmentation,
+            smooth_segmentation=smooth_segmentation,
+            min_detection_confidence=min_detection_confidence,
+            min_tracking_confidence=min_tracking_confidence
         )
         self.mp_draw = mp.solutions.drawing_utils
+        self.results = None
 
     def find_pose(self, img, draw=True):
+        """
+        Detect pose landmarks in an image
+        Args:
+            img: Input image (BGR format)
+            draw: Whether to draw landmarks on the image
+        Returns:
+            img: Processed image with landmarks drawn (if draw=True)
+        """
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.results = self.pose.process(img_rgb)
 
@@ -76,56 +48,39 @@ class PoseDetector:
         return img
 
     def get_positions(self, img):
-        landmarks = []
+        """
+        Get landmark positions as pixel coordinates
+        Args:
+            img: Input image
+        Returns:
+            landmarks: Dictionary of landmark positions {id: (x, y)}
+        """
+        landmarks = {}
         if self.results.pose_landmarks:
-            for id, lm in enumerate(self.results.pose_landmarks.landmark):
-                h, w, c = img.shape
-                cx, cy = int(lm.x * w), int(lm.y * h)
-                landmarks.append([id, cx, cy])
+            h, w, _ = img.shape
+            for idx, landmark in enumerate(self.results.pose_landmarks.landmark):
+                landmarks[idx] = (int(landmark.x * w), int(landmark.y * h))
         return landmarks
 
-    def extract_angles(self, landmarks):
+    def extract_angles(self, img, points):
+        """
+        Extract angles between specified landmark points
+        Args:
+            img: Input image
+            points: Dictionary of point triplets {angle_name: (p1, p2, p3)}
+        Returns:
+            angles: Dictionary of calculated angles
+        """
+        landmarks = self.get_positions(img)
+        if not landmarks:
+            return {}
+
         angles = {}
-
-        # Function to calculate the angle between three points
-        def calculate_angle(a, b, c):
-            # a, b, c are the three points in the format [x, y]
-            # Convert to numpy arrays for easier calculation
-            a = np.array(a)  # First point
-            b = np.array(b)  # Middle point (vertex of the angle)
-            c = np.array(c)  # Third point
-
-            # Calculate vectors
-            ab = a - b
-            bc = c - b
-
-            # Calculate dot product and magnitude of vectors
-            dot_product = np.dot(ab, bc)
-            magnitude_ab = np.linalg.norm(ab)
-            magnitude_bc = np.linalg.norm(bc)
-
-            # Calculate the angle in radians and then convert to degrees
-            angle = np.arccos(dot_product / (magnitude_ab * magnitude_bc))
-            return np.degrees(angle)
-
-        # Example: Extracting angles for shoulder, elbow, and wrist
-        if landmarks:
-            # Left side (example points: shoulder, elbow, wrist)
-            left_shoulder = landmarks[11][1:3]
-            left_elbow = landmarks[13][1:3]
-            left_wrist = landmarks[15][1:3]
-            angles["left_shoulder"] = calculate_angle(left_shoulder, left_elbow, left_wrist)
-
-            # Right side (example points: shoulder, elbow, wrist)
-            right_shoulder = landmarks[12][1:3]
-            right_elbow = landmarks[14][1:3]
-            right_wrist = landmarks[16][1:3]
-            angles["right_shoulder"] = calculate_angle(right_shoulder, right_elbow, right_wrist)
-
-            # Additional angles can be added similarly for other joints, e.g., hips, knees, etc.
-            # For example, if you want to calculate knee angles for squats:
-            # left_knee = landmarks[23][1:3]
-            # right_knee = landmarks[24][1:3]
-            # angles["left_knee"] = calculate_angle(left_shoulder, left_elbow, left_knee)
-
+        for key, (p1, p2, p3) in points.items():
+            if all(p in landmarks for p in (p1, p2, p3)):
+                angles[key] = calculate_angle(
+                    landmarks[p1],
+                    landmarks[p2],
+                    landmarks[p3]
+                )
         return angles
