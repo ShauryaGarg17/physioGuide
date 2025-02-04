@@ -1,0 +1,9 @@
+{
+    "exercise": "arm_raise",
+    "angles": {
+        "left_shoulder": 75.3,
+        "right_shoulder": 78.6,
+        "left_elbow": 145.2,
+        "right_elbow": 148.1
+    }
+}
