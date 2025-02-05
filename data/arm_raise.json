@@ -1,9 +1,41 @@
 {
     "exercise": "arm_raise",
     "angles": {
-        "left_shoulder": 75.3,
-        "right_shoulder": 78.6,
-        "left_elbow": 145.2,
-        "right_elbow": 148.1
+        "36s": {
+            "left_elbow": {
+                "min": 175.8,
+                "max": 179.7
+            },
+            "right_elbow": {
+                "min": 135.3,
+                "max": 178.4
+            },
+            "left_knee": {
+                "min": 18.0,
+                "max": 19.6
+            },
+            "right_knee": {
+                "min": 20.7,
+                "max": 21.2
+            }
+        },
+        "40s": {
+            "left_elbow": {
+                "min": 140.2,
+                "max": 179.9
+            },
+            "right_elbow": {
+                "min": 62.2,
+                "max": 178.3
+            },
+            "left_knee": {
+                "min": 18.7,
+                "max": 20.3
+            },
+            "right_knee": {
+                "min": 18.0,
+                "max": 20.9
+            }
+        }
     }
 }

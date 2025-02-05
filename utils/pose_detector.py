@@ -1,86 +1,48 @@
 import cv2
-import mediapipe as mp
-import numpy as np
-from .angle_calculator import calculate_angle
+import argparse
+from live_pose import LivePose
+from utils.pose_detector import PoseDetector
 
-class PoseDetector:
-    def __init__(self, static_image_mode=False,
-                 model_complexity=1,
-                 smooth_landmarks=True,
-                 enable_segmentation=False,
-                 smooth_segmentation=True,
-                 min_detection_confidence=0.5,
-                 min_tracking_confidence=0.5):
-        """
-        Initialize the PoseDetector with MediaPipe Pose parameters
-        """
-        self.mp_pose = mp.solutions.pose
-        self.pose = self.mp_pose.Pose(
-            static_image_mode=static_image_mode,
-            model_complexity=model_complexity,
-            smooth_landmarks=smooth_landmarks,
-            enable_segmentation=enable_segmentation,
-            smooth_segmentation=smooth_segmentation,
-            min_detection_confidence=min_detection_confidence,
-            min_tracking_confidence=min_tracking_confidence
-        )
-        self.mp_draw = mp.solutions.drawing_utils
-        self.results = None
 
-    def find_pose(self, img, draw=True):
-        """
-        Detect pose landmarks in an image
-        Args:
-            img: Input image (BGR format)
-            draw: Whether to draw landmarks on the image
-        Returns:
-            img: Processed image with landmarks drawn (if draw=True)
-        """
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        self.results = self.pose.process(img_rgb)
+def main():
+    # Set up argument parser
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--exercise', type=str, default='squat',
+                      help='Type of exercise to track (squat, pushup, arm_raise, lunge)')
+    parser.add_argument('--video', type=str, default='0',
+                      help='Path to video file (0 for webcam)')
+    args = parser.parse_args()
 
-        if self.results.pose_landmarks and draw:
-            self.mp_draw.draw_landmarks(
-                img,
-                self.results.pose_landmarks,
-                self.mp_pose.POSE_CONNECTIONS
-            )
-        return img
+    # Initialize detector
+    detector = PoseDetector()
 
-    def get_positions(self, img):
-        """
-        Get landmark positions as pixel coordinates
-        Args:
-            img: Input image
-        Returns:
-            landmarks: Dictionary of landmark positions {id: (x, y)}
-        """
-        landmarks = {}
-        if self.results.pose_landmarks:
-            h, w, _ = img.shape
-            for idx, landmark in enumerate(self.results.pose_landmarks.landmark):
-                landmarks[idx] = (int(landmark.x * w), int(landmark.y * h))
-        return landmarks
+    # Set up video capture
+    if args.video == '0':
+        cap = cv2.VideoCapture(0)
+    else:
+        cap = cv2.VideoCapture(args.video)
 
-    def extract_angles(self, img, points):
-        """
-        Extract angles between specified landmark points
-        Args:
-            img: Input image
-            points: Dictionary of point triplets {angle_name: (p1, p2, p3)}
-        Returns:
-            angles: Dictionary of calculated angles
-        """
-        landmarks = self.get_positions(img)
-        if not landmarks:
-            return {}
+    # Set video resolution
+    cap.set(3, 1280)
+    cap.set(4, 720)
 
-        angles = {}
-        for key, (p1, p2, p3) in points.items():
-            if all(p in landmarks for p in (p1, p2, p3)):
-                angles[key] = calculate_angle(
-                    landmarks[p1],
-                    landmarks[p2],
-                    landmarks[p3]
-                )
-        return angles
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        # Process frame
+        frame = detector.process_frame(frame, args.exercise)
+
+        # Display frame
+        cv2.imshow('Exercise Detection', frame)
+
+        # Break loop on 'q' press
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()
